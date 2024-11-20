@@ -4,18 +4,21 @@
   "main": "whatsappBot.js",
   "scripts": {
     "start": "node whatsappBot.js",
+    "dev": "nodemon whatsappBot.js",
     "test": "jest"
   },
   "keywords": [],
-  "author": "",
+  "author": "Tu Nombre",
   "license": "ISC",
-  "description": "",
+  "description": "Bot de WhatsApp usando whatsapp-web.js",
   "dependencies": {
+    "express": "^4.18.2",
     "puppeteer": "^23.8.0",
     "qrcode-terminal": "^0.12.0",
     "whatsapp-web.js": "^1.26.0"
   },
   "devDependencies": {
-    "jest": "^29.0.0"
+    "jest": "^29.0.0",
+    "nodemon": "^2.0.22"
   }
 }

@@ -1,12 +1,16 @@
+const express = require("express");
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const qrcode = require("qrcode-terminal");
-const procesarMensaje = require('./utils');
+const procesarMensaje = require("./utils");
+
+const app = express(); // Agregar Express para Vercel
 
 const grupoProveedores = ["Ventas usa clouthes andys", "Proveedor Fake"];
+
 // Inicializar cliente
 const client = new Client({
     authStrategy: new LocalAuth({
-        dataPath: "./.wwebjs_auth", // Ruta accesible en Render
+        dataPath: "./.wwebjs_auth", // Ruta relativa para autenticación
     }),
 });
 
@@ -24,15 +28,10 @@ client.on("ready", () => {
 client.on("message", async (message) => {
     try {
         const chat = await message.getChat();
-        //console.log(chat);
-        // Filtrar mensajes de los grupos proveedores
-        if (
-            grupoProveedores.includes(chat.name.trim())
-        ) {
+        if (grupoProveedores.includes(chat.name.trim())) {
             console.log(`Mensaje recibido de ${chat.name}: ${message.body || "Solo imagen"}`);
 
             if (message.hasMedia && !message.body) {
-                // Mensaje con solo imagen
                 const targetGroup = await obtenerGrupo("ReviewKairam", client);
                 if (targetGroup) {
                     const media = await message.downloadMedia();
@@ -40,16 +39,13 @@ client.on("message", async (message) => {
                     console.log(`Imagen enviada al grupo ${targetGroup.name}`);
                 }
             } else if (!message.hasMedia && message.body) {
-                // Mensaje con solo texto
                 const reviewGroup = await obtenerGrupo("ReviewKairam", client);
                 if (reviewGroup) {
                     await client.sendMessage(reviewGroup.id._serialized, message.body);
                     console.log(`Mensaje de texto enviado al grupo de revisión ${reviewGroup.name}`);
                 }
             } else if (message.hasMedia && message.body) {
-                // Mensaje con texto e imagen
                 const processedMessage = procesarMensaje(message.body);
-
                 if (processedMessage.isValid) {
                     const targetGroup = await obtenerGrupo("Prueba Kairam", client);
                     if (targetGroup) {
@@ -90,5 +86,10 @@ async function obtenerGrupo(nombreGrupo, client) {
     return chats.find((chat) => chat.name === nombreGrupo);
 }
 
-// Inicializar cliente
+// Inicializar cliente de WhatsApp
 client.initialize();
+
+// Servidor HTTP necesario para Vercel
+const PORT = process.env.PORT || 3000;
+app.get("/", (req, res) => res.send("Bot de WhatsApp ejecutándose."));
+app.listen(PORT, () => console.log(`Servidor corriendo en el puerto ${PORT}`));
