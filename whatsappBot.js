@@ -5,7 +5,9 @@ const procesarMensaje = require('./utils');
 const grupoProveedores = ["Ventas usa clouthes andys", "Proveedor Fake"];
 // Inicializar cliente
 const client = new Client({
-    authStrategy: new LocalAuth(),
+    authStrategy: new LocalAuth({
+        dataPath: "./.wwebjs_auth", // Ruta accesible en Render
+    }),
 });
 
 // Escuchar eventos del cliente

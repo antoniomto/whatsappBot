@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "whatsappBot.js",
   "scripts": {
+    "start": "node whatsappBot.js",
     "test": "jest"
   },
   "keywords": [],
