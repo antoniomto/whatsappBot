@@ -1,53 +1,113 @@
-const express = require("express");
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const qrcode = require("qrcode-terminal");
 const procesarMensaje = require("./utils");
 
-const app = express(); // Agregar Express para Vercel
-
 const grupoProveedores = ["Ventas usa clouthes andys", "Proveedor Fake"];
+const GRUPO_REVISION = "ReviewKairam"; // Grupo para revisión
+let GRUPO_DESTINO = "Kairam333 Clouthes"; // Kairam333 Clouthes  --  ReviewKairam   Grupo de destino final (inicial)
+const GRUPO_ADMIN = "BotAdmin"; // Grupo para comandos de administración
+
+const axios = require("axios");
+
+// Configuración de la API de Meta
+const FACEBOOK_PAGE_ID = "tu_facebook_page_id";
+const INSTAGRAM_BUSINESS_ID = "tu_instagram_business_id";
+const ACCESS_TOKEN = "tu_access_token";
+
+// Función para obtener la fecha y hora actuales en formato legible
+function getFormattedDateTime() {
+    const now = new Date();
+    return now.toLocaleString(); // Ejemplo: "18/11/2024, 14:30:15"
+}
 
 // Inicializar cliente
 const client = new Client({
-    authStrategy: new LocalAuth({
-        dataPath: "./.wwebjs_auth", // Ruta relativa para autenticación
-    }),
+    authStrategy: new LocalAuth(),
 });
 
 // Escuchar eventos del cliente
 client.on("qr", (qr) => {
-    console.log("Escanea este código QR para iniciar sesión:");
+    console.log(`[${getFormattedDateTime()}] Escanea este código QR para iniciar sesión:`);
     qrcode.generate(qr, { small: true });
 });
 
 client.on("ready", () => {
-    console.log("¡Cliente conectado y listo!");
+    console.log(`[${getFormattedDateTime()}] ¡Cliente conectado y listo!`);
+});
+
+// Reconectar automáticamente en caso de desconexión
+client.on("disconnected", (reason) => {
+    console.error(`[${getFormattedDateTime()}] Cliente desconectado. Razón: ${reason}`);
+    console.log(`[${getFormattedDateTime()}] Intentando reconectar...`);
+    client.initialize();
+});
+
+// Ping periódico para mantener la conexión activa
+setInterval(async () => {
+    try {
+        const chats = await client.getChats();
+        console.log(`[${getFormattedDateTime()}] Ping exitoso. Número de chats: ${chats.length}`);
+    } catch (error) {
+        console.error(`[${getFormattedDateTime()}] Error al enviar ping. Intentando reconectar...`);
+        client.initialize();
+    }
+}, 300000); // Cada 5 min
+
+// Manejo global de errores
+client.on("error", (error) => {
+    console.error(`[${getFormattedDateTime()}] Error inesperado: ${error}`);
+    console.log(`[${getFormattedDateTime()}] Intentando reconectar...`);
+    client.initialize();
 });
 
 // Escuchar mensajes
 client.on("message", async (message) => {
     try {
         const chat = await message.getChat();
-        if (grupoProveedores.includes(chat.name.trim())) {
-            console.log(`Mensaje recibido de ${chat.name}: ${message.body || "Solo imagen"}`);
+        const senderName = chat.isGroup ? `${chat.name} (Grupo)` : `${chat.name} (Contacto)`;
+        const messageContent = message.body || "Solo imagen";
 
+        console.log(`[${getFormattedDateTime()}] Mensaje recibido de ${senderName}: ${messageContent}`);
+
+        // Verificar si es el grupo de administración
+        if (chat.name === GRUPO_ADMIN) {
+            if (messageContent.toLowerCase() === "activar") {
+                GRUPO_DESTINO = "Kairam333 Clouthes";
+                console.log(`[${getFormattedDateTime()}] Grupo destino cambiado a: ${GRUPO_DESTINO}`);
+            } else if (messageContent.toLowerCase() === "desactivar") {
+                GRUPO_DESTINO = "Prueba Kairam";
+                console.log(`[${getFormattedDateTime()}] Grupo destino cambiado a: ${GRUPO_DESTINO}`);
+            }
+            return; // No procesar más para el grupo de administración
+        }
+
+        // Verificar si es un grupo de proveedores
+        if (grupoProveedores.some(grupo => chat.name.includes(grupo))) {
             if (message.hasMedia && !message.body) {
-                const targetGroup = await obtenerGrupo("ReviewKairam", client);
+                // Mensaje con solo imagen
+                const targetGroup = await obtenerGrupo(GRUPO_REVISION, client);
                 if (targetGroup) {
                     const media = await message.downloadMedia();
                     await client.sendMessage(targetGroup.id._serialized, media);
-                    console.log(`Imagen enviada al grupo ${targetGroup.name}`);
+                    console.log(`[${getFormattedDateTime()}] Imagen enviada al grupo ${GRUPO_REVISION}`);
                 }
             } else if (!message.hasMedia && message.body) {
-                const reviewGroup = await obtenerGrupo("ReviewKairam", client);
+                if (message.body.toLowerCase() === 'vendido' || message.body.toLowerCase() === 'vendidos') {
+                    console.log(`[${getFormattedDateTime()}] Mensaje ignorado por ser notificacion de 'vendido'.`);
+                    return;
+                }
+                // Mensaje con solo texto
+                const reviewGroup = await obtenerGrupo(GRUPO_REVISION, client);
                 if (reviewGroup) {
                     await client.sendMessage(reviewGroup.id._serialized, message.body);
-                    console.log(`Mensaje de texto enviado al grupo de revisión ${reviewGroup.name}`);
+                    console.log(`[${getFormattedDateTime()}] Mensaje de texto enviado al grupo de revisión ${GRUPO_REVISION}`);
                 }
             } else if (message.hasMedia && message.body) {
+                // Mensaje con texto e imagen
                 const processedMessage = procesarMensaje(message.body);
+
                 if (processedMessage.isValid) {
-                    const targetGroup = await obtenerGrupo("Prueba Kairam", client);
+                    const targetGroup = await obtenerGrupo(GRUPO_DESTINO, client);
                     if (targetGroup) {
                         const media = await message.downloadMedia();
                         await client.sendMessage(
@@ -55,12 +115,16 @@ client.on("message", async (message) => {
                             media,
                             { caption: processedMessage.text }
                         );
-                        console.log(
-                            `Mensaje con imagen y texto enviado al grupo ${targetGroup.name}: ${processedMessage.text}`
-                        );
+                        console.log(`[${getFormattedDateTime()}] Mensaje con imagen y texto enviado al grupo ${GRUPO_DESTINO}: ${processedMessage.text}`);
                     }
+                    //try {
+                    //    await publicarEnFacebook(processedMessage.text, mediaUrl);
+                    //    await publicarEnInstagram(processedMessage.text, mediaUrl);
+                    //} catch (error) {
+                    //    console.error(`[${getFormattedDateTime()}] Error al publicar en IG y/o FB el mensaje: ${error}`);
+                    //}
                 } else {
-                    const reviewGroup = await obtenerGrupo("ReviewKairam", client);
+                    const reviewGroup = await obtenerGrupo(GRUPO_REVISION, client);
                     if (reviewGroup) {
                         const media = await message.downloadMedia();
                         if (message.hasMedia) {
@@ -70,26 +134,63 @@ client.on("message", async (message) => {
                         } else {
                             await client.sendMessage(reviewGroup.id._serialized, message.body);
                         }
-                        console.log(`Mensaje con imagen y texto enviado a revisión ${reviewGroup.name}`);
+                        console.log(`[${getFormattedDateTime()}] Mensaje con imagen y texto enviado a revisión ${GRUPO_REVISION}`);
                     }
                 }
             }
         }
     } catch (error) {
-        console.error("Error al procesar el mensaje:", error);
+        console.error(`[${getFormattedDateTime()}] Error al procesar el mensaje: ${error}`);
     }
 });
 
 // Función para obtener el grupo de destino
 async function obtenerGrupo(nombreGrupo, client) {
-    const chats = await client.getChats();
-    return chats.find((chat) => chat.name === nombreGrupo);
+    try {
+        const chats = await client.getChats();
+        return chats.find((chat) => chat.name.includes(nombreGrupo));
+    } catch (error) {
+        console.error(`[${getFormattedDateTime()}] Error al obtener grupo: ${error}`);
+        return null;
+    }
 }
 
-// Inicializar cliente de WhatsApp
-client.initialize();
+async function publicarEnFacebook(text, mediaUrl) {
+    try {
+        const url = `https://graph.facebook.com/${FACEBOOK_PAGE_ID}/photos`;
+        const response = await axios.post(url, {
+            caption: text,
+            url: mediaUrl,
+            access_token: ACCESS_TOKEN,
+        });
+        console.log(`[${getFormattedDateTime()}] Publicación en Facebook exitosa: ${response.data.id}`);
+    } catch (error) {
+        console.error(`[${getFormattedDateTime()}] Error al publicar en Facebook: ${error.response.data.error.message}`);
+    }
+}
 
-// Servidor HTTP necesario para Vercel
-const PORT = process.env.PORT || 3000;
-app.get("/", (req, res) => res.send("Bot de WhatsApp ejecutándose."));
-app.listen(PORT, () => console.log(`Servidor corriendo en el puerto ${PORT}`));
+// Publicar en Instagram
+async function publicarEnInstagram(text, mediaUrl) {
+    try {
+        const url = `https://graph.facebook.com/${INSTAGRAM_BUSINESS_ID}/media`;
+        const mediaResponse = await axios.post(url, {
+            image_url: mediaUrl,
+            caption: text,
+            access_token: ACCESS_TOKEN,
+        });
+
+        const creationId = mediaResponse.data.id;
+        const publishUrl = `https://graph.facebook.com/${INSTAGRAM_BUSINESS_ID}/media_publish`;
+        await axios.post(publishUrl, {
+            creation_id: creationId,
+            access_token: ACCESS_TOKEN,
+        });
+
+        console.log(`[${getFormattedDateTime()}] Publicación en Instagram exitosa: ${creationId}`);
+    } catch (error) {
+        console.error(`[${getFormattedDateTime()}] Error al publicar en Instagram: ${error.response.data.error.message}`);
+    }
+}
+
+// Inicializar cliente
+client.initialize();
