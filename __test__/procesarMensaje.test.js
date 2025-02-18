@@ -6,7 +6,7 @@ describe('Procesar mensajes correctamente', () => {
         const output = procesarMensaje(input);
         expect(output).toEqual({
             isValid: true,
-            text: "Mk cross, precio: $1240"
+            text: "Mk cross precio: $1240"
         });
     });
 
@@ -42,7 +42,7 @@ describe('Procesar mensajes correctamente', () => {
         const output = procesarMensaje(input);
         expect(output).toEqual({
             isValid: true,
-            text: "Playera raplh, precio: $1240"
+            text: "Playera raplh precio: $1240"
         });
     });
 
@@ -51,7 +51,7 @@ describe('Procesar mensajes correctamente', () => {
         const output = procesarMensaje(input);
         expect(output).toEqual({
             isValid: true,
-            text: "Cinto talla s/m perfecto para usar con vestido, precio: $610"
+            text: "Cinto talla s/m perfecto para usar con vestido precio: $610"
         });
     });
 
@@ -60,7 +60,7 @@ describe('Procesar mensajes correctamente', () => {
         const output = procesarMensaje(input);
         expect(output).toEqual({
             isValid: true,
-            text: "Hay es otro modelo de Pandora es un poco mas elevado el precio pero si. Hay tallas si  es de, precio: $1240"
+            text: "Hay es otro modelo de Pandora es un poco mas elevado el precio pero si. Hay tallas si  es de precio: $1240"
         });
     });
 
@@ -69,7 +69,7 @@ describe('Procesar mensajes correctamente', () => {
         const output = procesarMensaje(input);
         expect(output).toEqual({
             isValid: true,
-            text: "Hay es otro modelo más de Pandora, precio: $1240"
+            text: "Hay es otro modelo más de Pandora precio: $1240"
         });
     });
    
@@ -79,7 +79,7 @@ describe('Procesar mensajes correctamente', () => {
         const output = procesarMensaje(input);
         expect(output).toEqual({
             isValid: true,
-            text: "Stanley, precio: $1240"
+            text: "Stanley precio: $1240"
         });
     });
 
@@ -88,7 +88,7 @@ describe('Procesar mensajes correctamente', () => {
         const output = procesarMensaje(input);
         expect(output).toEqual({
             isValid: true,
-            text: "Sudadera, precio: $1240; short, precio: $400"
+            text: "Sudadera precio: $1240; short precio: $400"
         });
     });
 
@@ -97,7 +97,7 @@ describe('Procesar mensajes correctamente', () => {
         const output = procesarMensaje(input);
         expect(output).toEqual({
             isValid: true,
-            text: "Sudadera, precio: $1240; short, precio: $1300"
+            text: "Sudadera precio: $1240; short precio: $1300"
         });
     });
 
@@ -151,7 +151,16 @@ describe('Procesar mensajes correctamente', () => {
         const output = procesarMensaje(input);
         expect(output).toEqual({
             isValid: true,
-            text: "Este modelo esta increible su, precio: $3180"
+            text: "Este modelo esta increible su precio: $3180"
+        });
+    });
+
+    test('precio y anticpo new test', () => {
+        const input = "Este modelo esta increible su costo 2,890 anticpo $1000 sujeto a disponbibilidad";
+        const output = procesarMensaje(input);
+        expect(output).toEqual({
+            isValid: true,
+            text: "Este modelo esta increible su precio: $3180"
         });
     });
 });
