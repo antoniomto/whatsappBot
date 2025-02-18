@@ -7,13 +7,6 @@ const GRUPO_REVISION = "ReviewKairam"; // Grupo para revisión
 let GRUPO_DESTINO = "Kairam333 Clouthes"; // Kairam333 Clouthes  --  ReviewKairam   Grupo de destino final (inicial)
 const GRUPO_ADMIN = "BotAdmin"; // Grupo para comandos de administración
 
-const axios = require("axios");
-
-// Configuración de la API de Meta
-const FACEBOOK_PAGE_ID = "tu_facebook_page_id";
-const INSTAGRAM_BUSINESS_ID = "tu_instagram_business_id";
-const ACCESS_TOKEN = "tu_access_token";
-
 // Función para obtener la fecha y hora actuales en formato legible
 function getFormattedDateTime() {
     const now = new Date();
@@ -117,12 +110,6 @@ client.on("message", async (message) => {
                         );
                         console.log(`[${getFormattedDateTime()}] Mensaje con imagen y texto enviado al grupo ${GRUPO_DESTINO}: ${processedMessage.text}`);
                     }
-                    //try {
-                    //    await publicarEnFacebook(processedMessage.text, mediaUrl);
-                    //    await publicarEnInstagram(processedMessage.text, mediaUrl);
-                    //} catch (error) {
-                    //    console.error(`[${getFormattedDateTime()}] Error al publicar en IG y/o FB el mensaje: ${error}`);
-                    //}
                 } else {
                     const reviewGroup = await obtenerGrupo(GRUPO_REVISION, client);
                     if (reviewGroup) {
@@ -155,42 +142,6 @@ async function obtenerGrupo(nombreGrupo, client) {
     }
 }
 
-async function publicarEnFacebook(text, mediaUrl) {
-    try {
-        const url = `https://graph.facebook.com/${FACEBOOK_PAGE_ID}/photos`;
-        const response = await axios.post(url, {
-            caption: text,
-            url: mediaUrl,
-            access_token: ACCESS_TOKEN,
-        });
-        console.log(`[${getFormattedDateTime()}] Publicación en Facebook exitosa: ${response.data.id}`);
-    } catch (error) {
-        console.error(`[${getFormattedDateTime()}] Error al publicar en Facebook: ${error.response.data.error.message}`);
-    }
-}
-
-// Publicar en Instagram
-async function publicarEnInstagram(text, mediaUrl) {
-    try {
-        const url = `https://graph.facebook.com/${INSTAGRAM_BUSINESS_ID}/media`;
-        const mediaResponse = await axios.post(url, {
-            image_url: mediaUrl,
-            caption: text,
-            access_token: ACCESS_TOKEN,
-        });
-
-        const creationId = mediaResponse.data.id;
-        const publishUrl = `https://graph.facebook.com/${INSTAGRAM_BUSINESS_ID}/media_publish`;
-        await axios.post(publishUrl, {
-            creation_id: creationId,
-            access_token: ACCESS_TOKEN,
-        });
-
-        console.log(`[${getFormattedDateTime()}] Publicación en Instagram exitosa: ${creationId}`);
-    } catch (error) {
-        console.error(`[${getFormattedDateTime()}] Error al publicar en Instagram: ${error.response.data.error.message}`);
-    }
-}
 
 // Inicializar cliente
 client.initialize();
