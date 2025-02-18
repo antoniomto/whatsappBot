@@ -16,6 +16,9 @@ function getFormattedDateTime() {
 // Inicializar cliente
 const client = new Client({
     authStrategy: new LocalAuth(),
+    puppeteer: {
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+    }
 });
 
 // Escuchar eventos del cliente
