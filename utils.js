@@ -11,7 +11,6 @@ function procesarMensaje(text) {
     // Limpiar precios asociados a "contado" o "apartado"
     let textoLimpio = text.replace(regexContado, "").replace(regexApartado, "").trim();
     textoLimpio = textoLimpio.replace(/costo|costó|Costo|Costó/g, "").trim();
-    textoLimpio = textoLimpio.replace(/,/g, "").trim();
 
     // Procesar descripciones y precios válidos
     const matches = [...textoLimpio.matchAll(regexDescripcionYPrecio)];

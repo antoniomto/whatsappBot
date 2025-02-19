@@ -154,13 +154,4 @@ describe('Procesar mensajes correctamente', () => {
             text: "Este modelo esta increible su precio: $3180"
         });
     });
-
-    test('precio y anticpo new test', () => {
-        const input = "Este modelo esta increible su costo 2,890 anticpo $1000 sujeto a disponbibilidad";
-        const output = procesarMensaje(input);
-        expect(output).toEqual({
-            isValid: true,
-            text: "Este modelo esta increible su precio: $3180"
-        });
-    });
 });
