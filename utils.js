@@ -2,13 +2,14 @@ function procesarMensaje(text) {
     // Regex para precios de 3 o más dígitos (con o sin símbolo $)
     const regexPrecio = /\$?\b\d{3,}(\.\d+)?\b/g;
     // Regex para identificar precios asociados a "anticipo" o "apartado"
-    const regexApartado = /\b(?:apartado|anticipo|anticpo|antcipo|anticp)\s+\$?\d{3,}(\.\d+)?\b/gi;
+    const regexApartado = /\b(?:apartado|anticipo|anricpo|anticpo|antcipo|anticp)\s+\$?\d{3,}(\.\d+)?\b/gi;
     // Regex para identificar precios asociados a "contado"
     const regexContado = /\b(?:contado|cntado|cntd)\s+\$?\d{3,}(\.\d+)?\b/gi;
     // Regex para cualquier texto seguido de un precio válido
     const regexDescripcionYPrecio = /([\w\s.,/áéíóúñ]*?)\s*\$?\b(\d{3,}(\.\d+)?)\b/g;
 
     // Limpiar precios asociados a "contado" o "apartado"
+    text = text.replace(",","");
     let textoLimpio = text.replace(regexContado, "").replace(regexApartado, "").trim();
     textoLimpio = textoLimpio.replace(/costo|costó|Costo|Costó/g, "").trim();
 
