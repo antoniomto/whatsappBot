@@ -34,8 +34,15 @@ function procesarMensaje(text) {
         } else if (precioOriginal > 5000) {
             incremento = 1.08; // Agregar 8%
         }
-        // Calcular precio con incremento del 13% redondeado al múltiplo de 10
-        const precioConIncremento = Math.round((precioOriginal * incremento) / 10) * 10;
+
+        // Calcular precio con incremento
+        let precioConIncremento = Math.round((precioOriginal * incremento) / 10) * 10;
+        
+        // Asegurar que la ganancia sea de al menos $100
+        if (precioConIncremento - precioOriginal < 100) {
+            precioConIncremento = precioOriginal + 100;
+        }
+
         return { descripcion, precio: precioConIncremento };
     });
 
