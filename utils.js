@@ -25,14 +25,16 @@ function procesarMensaje(text) {
         }
 
         let incremento = 1.20;
-        if (precioOriginal >= 100 && precioOriginal <= 1000) {
+        if (precioOriginal >= 100 && precioOriginal <= 500) {
             incremento = 1.20; // Agregar 15%
+        }if (precioOriginal >= 100 && precioOriginal <= 1000) {
+            incremento = 1.15; // Agregar 15%
         } else if (precioOriginal > 1000 && precioOriginal <= 2000) {
-            incremento = 1.20; // Agregar 13%
+            incremento = 1.13; // Agregar 13%
         } else if (precioOriginal > 2000 && precioOriginal <= 5000) {
-            incremento = 1.20; // Agregar 10%
+            incremento = 1.10; // Agregar 10%
         } else if (precioOriginal > 5000) {
-            incremento = 1.20; // Agregar 8%
+            incremento = 1.08; // Agregar 8%
         }
 
         // Calcular precio con incremento
