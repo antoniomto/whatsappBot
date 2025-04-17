@@ -17,9 +17,19 @@ function getFormattedDateTime() {
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        headless: true,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-software-rasterizer',
+            '--single-process',
+            '--no-zygote'
+        ]
     }
 });
+
 
 // Escuchar eventos del cliente
 client.on("qr", (qr) => {
