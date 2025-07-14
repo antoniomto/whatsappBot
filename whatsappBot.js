@@ -3,17 +3,15 @@ const qrcode = require("qrcode-terminal");
 const procesarMensaje = require("./utils");
 
 const grupoProveedores = ["Ventas usa clouthes andys", "Proveedor Fake", "Mayoristas VIP 2"];
-const GRUPO_REVISION = "ReviewKairam"; // Grupo para revisión
-let GRUPO_DESTINO = "Kairam333 Clouthes"; // Kairam333 Clouthes  --  ReviewKairam   Grupo de destino final (inicial)
-const GRUPO_ADMIN = "BotAdmin"; // Grupo para comandos de administración
+const GRUPO_REVISION = "ReviewKairam";
+let GRUPO_DESTINO = "Kairam333 Clouthes";
+const GRUPO_ADMIN = "BotAdmin";
 
-// Función para obtener la fecha y hora actuales en formato legible
 function getFormattedDateTime() {
     const now = new Date();
-    return now.toLocaleString(); // Ejemplo: "18/11/2024, 14:30:15"
+    return now.toLocaleString();
 }
 
-// Inicializar cliente
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
@@ -30,8 +28,6 @@ const client = new Client({
     }
 });
 
-
-// Escuchar eventos del cliente
 client.on("qr", (qr) => {
     console.log(`[${getFormattedDateTime()}] Escanea este código QR para iniciar sesión:`);
     qrcode.generate(qr, { small: true });
@@ -41,14 +37,12 @@ client.on("ready", () => {
     console.log(`[${getFormattedDateTime()}] ¡Cliente conectado y listo!`);
 });
 
-// Reconectar automáticamente en caso de desconexión
 client.on("disconnected", (reason) => {
     console.error(`[${getFormattedDateTime()}] Cliente desconectado. Razón: ${reason}`);
     console.log(`[${getFormattedDateTime()}] Intentando reconectar...`);
     client.initialize();
 });
 
-// Ping periódico para mantener la conexión activa
 setInterval(async () => {
     try {
         const chats = await client.getChats();
@@ -57,16 +51,14 @@ setInterval(async () => {
         console.error(`[${getFormattedDateTime()}] Error al enviar ping. Intentando reconectar...`);
         client.initialize();
     }
-}, 300000); // Cada 5 min
+}, 300000); // 5 minutos
 
-// Manejo global de errores
 client.on("error", (error) => {
     console.error(`[${getFormattedDateTime()}] Error inesperado: ${error}`);
     console.log(`[${getFormattedDateTime()}] Intentando reconectar...`);
     client.initialize();
 });
 
-// Escuchar mensajes
 client.on("message", async (message) => {
     try {
         const chat = await message.getChat();
@@ -75,7 +67,6 @@ client.on("message", async (message) => {
 
         console.log(`[${getFormattedDateTime()}] Mensaje recibido de ${senderName}: ${messageContent}`);
 
-        // Verificar si es el grupo de administración
         if (chat.name === GRUPO_ADMIN) {
             if (messageContent.toLowerCase() === "activar") {
                 GRUPO_DESTINO = "Kairam333 Clouthes";
@@ -84,38 +75,45 @@ client.on("message", async (message) => {
                 GRUPO_DESTINO = "Prueba Kairam";
                 console.log(`[${getFormattedDateTime()}] Grupo destino cambiado a: ${GRUPO_DESTINO}`);
             }
-            return; // No procesar más para el grupo de administración
+            return;
         }
 
-        // Verificar si es un grupo de proveedores
         if (grupoProveedores.some(grupo => chat.name.includes(grupo))) {
             if (message.hasMedia && !message.body) {
-                // Mensaje con solo imagen
                 const targetGroup = await obtenerGrupo(GRUPO_REVISION, client);
                 if (targetGroup) {
                     const media = await message.downloadMedia();
+                    if (!media) {
+                        console.warn(`[${getFormattedDateTime()}] No se pudo descargar media. Se omite.`);
+                        return;
+                    }
                     await client.sendMessage(targetGroup.id._serialized, media);
                     console.log(`[${getFormattedDateTime()}] Imagen enviada al grupo ${GRUPO_REVISION}`);
                 }
             } else if (!message.hasMedia && message.body) {
                 if (message.body.toLowerCase() === 'vendido' || message.body.toLowerCase() === 'vendidos') {
-                    console.log(`[${getFormattedDateTime()}] Mensaje ignorado por ser notificacion de 'vendido'.`);
+                    console.log(`[${getFormattedDateTime()}] Mensaje ignorado por ser notificación de 'vendido'.`);
                     return;
                 }
-                // Mensaje con solo texto
+
                 const reviewGroup = await obtenerGrupo(GRUPO_REVISION, client);
                 if (reviewGroup) {
                     await client.sendMessage(reviewGroup.id._serialized, message.body);
                     console.log(`[${getFormattedDateTime()}] Mensaje de texto enviado al grupo de revisión ${GRUPO_REVISION}`);
                 }
             } else if (message.hasMedia && message.body) {
-                // Mensaje con texto e imagen
                 const processedMessage = procesarMensaje(message.body);
+
+                console.log(`[${getFormattedDateTime()}] Texto original: ${message.body} → Procesado: ${processedMessage.text}`);
 
                 if (processedMessage.isValid) {
                     const targetGroup = await obtenerGrupo(GRUPO_DESTINO, client);
                     if (targetGroup) {
                         const media = await message.downloadMedia();
+                        if (!media) {
+                            console.warn(`[${getFormattedDateTime()}] No se pudo descargar media. Se omite.`);
+                            return;
+                        }
                         await client.sendMessage(
                             targetGroup.id._serialized,
                             media,
@@ -127,13 +125,13 @@ client.on("message", async (message) => {
                     const reviewGroup = await obtenerGrupo(GRUPO_REVISION, client);
                     if (reviewGroup) {
                         const media = await message.downloadMedia();
-                        if (message.hasMedia) {
-                            await client.sendMessage(reviewGroup.id._serialized, media, {
-                                caption: message.body,
-                            });
-                        } else {
-                            await client.sendMessage(reviewGroup.id._serialized, message.body);
+                        if (!media) {
+                            console.warn(`[${getFormattedDateTime()}] No se pudo descargar media. Se omite.`);
+                            return;
                         }
+                        await client.sendMessage(reviewGroup.id._serialized, media, {
+                            caption: message.body,
+                        });
                         console.log(`[${getFormattedDateTime()}] Mensaje con imagen y texto enviado a revisión ${GRUPO_REVISION}`);
                     }
                 }
@@ -144,7 +142,6 @@ client.on("message", async (message) => {
     }
 });
 
-// Función para obtener el grupo de destino
 async function obtenerGrupo(nombreGrupo, client) {
     try {
         const chats = await client.getChats();
@@ -155,6 +152,4 @@ async function obtenerGrupo(nombreGrupo, client) {
     }
 }
 
-
-// Inicializar cliente
 client.initialize();
