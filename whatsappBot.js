@@ -2,7 +2,7 @@ const { Client, LocalAuth } = require("whatsapp-web.js");
 const qrcode = require("qrcode-terminal");
 const procesarMensaje = require("./utils");
 
-const grupoProveedores = ["Ventas usa clouthes andys", "Proveedor Fake"];
+const grupoProveedores = ["Ventas usa clouthes andys", "Proveedor Fake", "Mayoristas VIP 2"];
 const GRUPO_REVISION = "ReviewKairam"; // Grupo para revisión
 let GRUPO_DESTINO = "Kairam333 Clouthes"; // Kairam333 Clouthes  --  ReviewKairam   Grupo de destino final (inicial)
 const GRUPO_ADMIN = "BotAdmin"; // Grupo para comandos de administración
