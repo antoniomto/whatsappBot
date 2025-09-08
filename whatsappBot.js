@@ -152,4 +152,17 @@ async function obtenerGrupo(nombreGrupo, client) {
     }
 }
 
-client.initialize();
+async function reiniciarCliente() {
+    try {
+        console.log("🧹 Destruyendo cliente...");
+        await client.destroy();
+    } catch (e) {
+        console.warn("Cliente ya destruido o no iniciado.");
+    }
+
+    console.log("🔁 Inicializando cliente...");
+    await client.initialize();
+}
+
+
+reiniciarCliente();
