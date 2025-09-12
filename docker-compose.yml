@@ -1,0 +1,13 @@
+version: "3.8"
+services:
+  kairam-wpp:
+    build: .
+    container_name: kairam-wpp
+    restart: unless-stopped
+    environment:
+      - TZ=America/Mexico_City
+    volumes:
+      - ./tokens:/app/tokens
+      - ./userDataDir:/app/userDataDir
+    stdin_open: true
+    tty: true

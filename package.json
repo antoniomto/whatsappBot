@@ -1,24 +1,13 @@
 {
-  "name": "whatsapp-bot",
+  "name": "kairam-wpp",
   "version": "1.0.0",
-  "main": "whatsappBot.js",
+  "main": "app.js",
+  
   "scripts": {
-    "start": "node whatsappBot.js",
-    "dev": "nodemon whatsappBot.js",
-    "test": "jest"
+    "start": "node app.js"
   },
-  "keywords": [],
-  "author": "Tu Nombre",
-  "license": "ISC",
-  "description": "Bot de WhatsApp usando whatsapp-web.js",
   "dependencies": {
-    "express": "^4.18.2",
-    "puppeteer": "^23.8.0",
-    "qrcode-terminal": "^0.12.0",
-    "whatsapp-web.js": "^1.26.0"
-  },
-  "devDependencies": {
-    "jest": "^29.0.0",
-    "nodemon": "^2.0.22"
+    "@wppconnect-team/wppconnect": "^1.26.0",
+    "qrcode-terminal": "^0.12.0"
   }
 }

@@ -1,0 +1,10 @@
+# dependencias
+node_modules/
+
+# sesiones locales de WPPConnect
+tokens/
+userDataDir/
+
+# logs y archivos temporales
+*.log
+*.tmp
