@@ -213,6 +213,16 @@ wppconnect.create({
 }).then(client => {
   console.log(`[${now()}] ✅ Cliente conectado y listo!`);
 
+setInterval(async () => {
+    try {
+      await client.isConnected();
+      console.log('🏓 Ping OK');
+    } catch (error) {
+      console.log('❌ Conexión perdida, saliendo...');
+      process.exit(1);
+    }
+  }, 2 * 60 * 1000);
+
   client.onMessage(async (message) => {
     try {
       const chat = await client.getChatById(message.chatId);
@@ -312,6 +322,10 @@ wppconnect.create({
       console.error(`[${now()}] 🔍 Stack trace:`, e?.stack);
     }
   });
+process.on('uncaughtException', (error) => {
+  console.error('💥 Error fatal:', error.message);
+  process.exit(1);
+});
 }).catch(err => console.error('❌ Error iniciando WPPConnect:', err));
 
 // === Utilidad: buscar grupo por nombre ===
