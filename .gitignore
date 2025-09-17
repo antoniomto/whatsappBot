@@ -1,10 +1,19 @@
-# dependencias
-node_modules/
+# Dependencias locales
+node_modules
 
-# sesiones locales de WPPConnect
-tokens/
-userDataDir/
+# Sesiones y datos persistentes de WPPConnect
+tokens
+userDataDir
 
-# logs y archivos temporales
+# Archivos de Git
+.git
+.gitignore
+
+# Archivos de Docker/Compose (no tienen que ir dentro de la imagen)
+Dockerfile
+docker-compose.yml
+
+# Logs y temporales
 *.log
 *.tmp
+npm-debug.log

@@ -1,68 +1,78 @@
 function procesarMensaje(text) {
-    // Regex para precios de 3 o más dígitos (con o sin símbolo $)
-    const regexPrecio = /\$?\b\d{3,}(\.\d+)?\b/g;
-    // Regex para identificar precios asociados a "anticipo" o "apartado"
-    const regexApartado = /\b(?:apartado|anticipo|anricpo|anticpo|antcipo|anticp)\s+\$?\d{3,}(\.\d+)?\b/gi;
-    // Regex para identificar precios asociados a "contado"
-    const regexContado = /\b(?:contado|cntado|cntd)\s+\$?\d{3,}(\.\d+)?\b/gi;
-    // Regex para cualquier texto seguido de un precio válido
-    const regexDescripcionYPrecio = /([\w\s.,/áéíóúñ]*?)\s*\$?\b(\d{3,}(\.\d+)?)\b/g;
-
-    // Limpiar precios asociados a "contado" o "apartado"
-    text = text.replace(",","");
-    let textoLimpio = text.replace(regexContado, "").replace(regexApartado, "").trim();
-    textoLimpio = textoLimpio.replace(/costo|costó|Costo|Costó/g, "").trim();
-
-    // Procesar descripciones y precios válidos
-    const matches = [...textoLimpio.matchAll(regexDescripcionYPrecio)];
-    const resultados = matches.map(match => {
-        let descripcion = match[1].trim();
-        const precioOriginal = parseFloat(match[2].replace(/[^0-9.]/g, ""));
-
-        // Si no hay descripción, solo el precio
-        if (!descripcion) {
-            descripcion = null;
-        }
-
-        let incremento = 1.20;
-        if (precioOriginal >= 100 && precioOriginal <= 500) {
-            incremento = 1.20; // Agregar 15%
-        }if (precioOriginal >= 100 && precioOriginal <= 1000) {
-            incremento = 1.20; // Agregar 15%
-        } else if (precioOriginal > 1000 && precioOriginal <= 2000) {
-            incremento = 1.15; // Agregar 13%
-        } else if (precioOriginal > 2000 && precioOriginal <= 5000) {
-            incremento = 1.12; // Agregar 10%
-        } else if (precioOriginal > 5000) {
-            incremento = 1.10; // Agregar 8%
-        }
-
-        // Calcular precio con incremento
-        let precioConIncremento = Math.round((precioOriginal * incremento) / 10) * 10;
-        
-        // Asegurar que la ganancia sea de al menos $100
-        if (precioConIncremento - precioOriginal < 100) {
-            precioConIncremento = precioOriginal + 100;
-        }
-
-        return { descripcion, precio: precioConIncremento };
-    });
-
-    // Si no hay precios válidos
-    if (resultados.length === 0) {
+    if (!text || text.trim().length === 0) {
         return { isValid: false, text };
     }
 
-    // Construir mensaje final si hay precios válidos
-    const partesMensaje = resultados.map(r => {
-        if (r.descripcion) {
-            return `${r.descripcion} precio: $${r.precio}`;
-        } else {
-            return `$${r.precio}`;
-        }
-    });
+    // Paso 1: Limpieza inicial básica
+    text = text.replace(/,/g, "").trim();
 
-    return { isValid: true, text: partesMensaje.join("; ") };
+    // Paso 2: Limpieza de patrones problemáticos ANTES de evaluar
+    let textoLimpio = text
+        .replace(/modelo\s+\d+/gi, "") // Eliminar "modelo 1060"
+        .replace(/talla\s+\d+/gi, "") // Eliminar "talla 42"
+        .replace(/\d+\s*(?:ml|cm|mm|onzas?|kg|gr|litros?)/gi, "") // Eliminar medidas "750ml", "30 onzas"
+        .replace(/referencia\s+\d+/gi, "") // Eliminar "referencia 123"
+        .replace(/código\s+\d+/gi, "") // Eliminar "código 456"
+        .replace(/ref\s+\d+/gi, "") // Eliminar "ref 789"
+        .replace(/\s+/g, " ") // Normalizar espacios
+        .trim();
+
+    // Paso 3: Buscar números de 3+ dígitos en texto limpio (candidatos a precio)
+    const numerosTresDigitos = textoLimpio.match(/\b\d{3,}\b/g) || [];
+
+    // Paso 4: Validar según cantidad de números encontrados
+    if (numerosTresDigitos.length === 0) {
+        return { isValid: false, text }; // Sin precios válidos → revisión
+    }
+
+    if (numerosTresDigitos.length > 1) {
+        return { isValid: false, text }; // Múltiples precios → revisión
+    }
+
+    // Paso 5: Validar rango del único precio encontrado
+    const precioOriginal = parseInt(numerosTresDigitos[0]);
+    if (precioOriginal < 100 || precioOriginal > 50000) {
+        return { isValid: false, text }; // Fuera de rango → revisión
+    }
+
+    // Paso 6: Aplicar márgenes (tu lógica original)
+    let incremento = 1.20;
+    if (precioOriginal >= 100 && precioOriginal <= 1000) {
+        incremento = 1.20; // 20%
+    } else if (precioOriginal > 1000 && precioOriginal <= 2000) {
+        incremento = 1.15; // 15%
+    } else if (precioOriginal > 2000 && precioOriginal <= 5000) {
+        incremento = 1.12; // 12%
+    } else if (precioOriginal > 5000) {
+        incremento = 1.10; // 10%
+    }
+
+    // Calcular precio con incremento
+    let precioConIncremento = Math.round((precioOriginal * incremento) / 10) * 10;
+    
+    // Asegurar que la ganancia sea de al menos $100
+    if (precioConIncremento - precioOriginal < 100) {
+        precioConIncremento = precioOriginal + 100;
+    }
+
+    // Paso 7: Generar descripción limpia para el mensaje final
+    const descripcionLimpia = textoLimpio
+        .replace(/\$?\d{3,}/g, "") // Eliminar números de precio
+        .replace(/precio\s*:?\s*/gi, "") // Eliminar palabra "precio"
+        .replace(/costo\s*:?\s*/gi, "") // Eliminar palabra "costo"
+        .replace(/vale\s*/gi, "") // Eliminar "vale"
+        .replace(/\s+/g, " ") // Normalizar espacios
+        .trim();
+
+    // Construir mensaje final
+    const mensajeFinal = descripcionLimpia 
+        ? `${descripcionLimpia} precio: $${precioConIncremento}` 
+        : `$${precioConIncremento}`;
+
+    return { 
+        isValid: true, 
+        text: mensajeFinal 
+    };
 }
 
 module.exports = procesarMensaje;

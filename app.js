@@ -1,4 +1,4 @@
-// app.js – WPPConnect robusto (versión corregida)
+// app.js – WPPConnect con filtro administrativo y keep-alive
 const wppconnect = require('@wppconnect-team/wppconnect');
 const qrcode = require('qrcode-terminal');
 const fs = require('fs');
@@ -14,6 +14,41 @@ let GRUPO_DESTINO = "Kairam333 Clouthes";
 const GRUPO_ADMIN = "BotAdmin";
 
 const now = () => new Date().toLocaleString();
+
+// === NUEVO: Función para detectar mensajes administrativos ===
+function esMensajeAdministrativo(texto) {
+  if (!texto) return false;
+  
+  const textoLower = texto.toLowerCase();
+  
+  // Regla 1: Mensajes muy largos (probablemente informativos)
+  if (texto.length > 300) return true;
+  
+  // Regla 2: Patrones promocionales de mayoreo
+  const patronesPromo = [
+    /hello!!|hola!!/i,  // Saludos con múltiples exclamaciones
+    /venta de mayoreo|mayoreo desde/i,  // Menciones de mayoreo
+    /te esperamos|los esperamos/i,  // Frases de invitación
+    /estamos en el grupo|grupo.*https/i,  // Referencias a grupos
+    /precio de mayoreo/i,  // Precios mayoristas
+    /anticipo.*obligator/i,  // Términos de anticipo
+    /envio.*gratis.*primera/i  // Políticas de envío
+  ];
+  
+  // Si coincide con 2 o más patrones promocionales
+  const coincidenciasPromo = patronesPromo.filter(patron => patron.test(texto)).length;
+  if (coincidenciasPromo >= 2) return true;
+  
+  // Regla 3: Patrones de calendario
+  const patronCalendario = /\b(lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)\s+\d+.*[-–]/i;
+  if (patronCalendario.test(texto)) return true;
+  
+  // Regla 4: Múltiples días de la semana
+  const diasSemana = (texto.match(/\b(lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)\b/gi) || []).length;
+  if (diasSemana >= 2) return true;
+  
+  return false;
+}
 
 // ---------- Utilidades ----------
 const looksLikeBase64 = (s = "") =>
@@ -33,87 +68,45 @@ const extFromMime = (mime = "") => {
   return '.bin';
 };
 
-// ✅ FUNCIÓN CORREGIDA PARA MANEJAR MEDIA
 async function sendMediaWithCaption(client, toId, mediaObj, caption) {
+  // mediaObj: { mimetype, data }
+  const prefixed = mediaObj.data.startsWith('data:')
+    ? mediaObj.data
+    : `data:${mediaObj.mimetype};base64,${mediaObj.data}`;
+  const filename = `file${extFromMime(mediaObj.mimetype)}`;
+
+  // 1) Intento con sendImage (suele reconocer mejor base64 con prefijo)
   try {
-    console.log(`[${now()}] 🔄 Intentando enviar media...`);
-    
-    // Verificar que mediaObj existe y tiene datos
-    if (!mediaObj) {
-      console.error(`[${now()}] ❌ mediaObj es null o undefined`);
-      return false;
-    }
-
-    // WPPConnect puede retornar diferentes estructuras, verificamos todas
-    let mediaData = mediaObj.data || mediaObj.base64 || mediaObj;
-    let mimeType = mediaObj.mimetype || mediaObj.mime || 'image/jpeg';
-    
-    if (!mediaData) {
-      console.error(`[${now()}] ❌ No se encontraron datos de media en el objeto`);
-      console.log(`[${now()}] 🔍 Estructura del mediaObj:`, Object.keys(mediaObj));
-      return false;
-    }
-
-    // Asegurar que los datos estén en formato correcto
-    if (typeof mediaData !== 'string') {
-      console.error(`[${now()}] ❌ mediaData no es string, es:`, typeof mediaData);
-      return false;
-    }
-
-    // Preparar el formato correcto para envío
-    const prefixed = mediaData.startsWith('data:') 
-      ? mediaData 
-      : `data:${mimeType};base64,${mediaData}`;
-    
-    const filename = `file${extFromMime(mimeType)}`;
-
-    // 1) Intentar con sendImage
+    await client.sendImage(toId, prefixed, filename, caption);
+    return true;
+  } catch (e1) {
+    // 2) Fallback a sendFile (acepta base64 con prefijo)
     try {
-      await client.sendImage(toId, prefixed, filename, caption || '');
-      console.log(`[${now()}] ✅ Media enviada con sendImage`);
+      await client.sendFile(toId, prefixed, filename, caption);
       return true;
-    } catch (e1) {
-      // 2) Fallback a sendFile (silencioso)
+    } catch (e2) {
+      // 3) Último recurso: escribir archivo temporal y mandarlo por ruta
       try {
-        await client.sendFile(toId, prefixed, filename, caption || '');
-        console.log(`[${now()}] ✅ Media enviada con sendFile`);
+        const tmpPath = path.join(os.tmpdir(), `kairam-${Date.now()}${extFromMime(mediaObj.mimetype)}`);
+        fs.writeFileSync(tmpPath, Buffer.from(mediaObj.data, 'base64'));
+        await client.sendFile(toId, tmpPath, filename, caption);
+        fs.unlink(tmpPath, () => {});
         return true;
-      } catch (e2) {
-        
-        // 3) Último recurso: archivo temporal
-        try {
-          const tmpPath = path.join(os.tmpdir(), `kairam-${Date.now()}${extFromMime(mimeType)}`);
-          const buffer = Buffer.from(mediaData.replace(/^data:[^;]+;base64,/, ''), 'base64');
-          fs.writeFileSync(tmpPath, buffer);
-          
-          await client.sendFile(toId, tmpPath, filename, caption || '');
-          console.log(`[${now()}] ✅ Media enviada con archivo temporal`);
-          
-          // Limpiar archivo temporal
-          fs.unlink(tmpPath, () => {});
-          return true;
-        } catch (e3) {
-          console.error(`[${now()}] ❌ Todos los métodos fallaron:`, e3?.message || e3);
-          return false;
-        }
+      } catch (e3) {
+        console.error(`[${now()}] ❌ Falló envío media (todos los intentos):`, e3?.message || e3);
+        return false;
       }
     }
-  } catch (error) {
-    console.error(`[${now()}] ❌ Error en sendMediaWithCaption:`, error?.message || error);
-    return false;
   }
 }
 
-// ✅ FUNCIÓN MEJORADA PARA DETECTAR MEDIA
 function hasMedia(msg) {
   return Boolean(msg.mimetype) ||
          Boolean(msg.isMedia) ||
-         Boolean(msg.mediaKey) ||
-         Boolean(msg.clientUrl) ||
          ['image', 'video', 'audio', 'document', 'ptt', 'sticker'].includes(msg.type);
 }
 
-// ✅ FUNCIÓN MEJORADA PARA DESCARGAR MEDIA
+// === NUEVO: Función mejorada para descargar media ===
 async function downloadMediaSafely(client, message) {
   try {
     console.log(`[${now()}] 🔄 Descargando media...`);
@@ -139,7 +132,7 @@ async function downloadMediaSafely(client, message) {
         if (rawMedia) {
           console.log(`[${now()}] ✅ Media descargada con decryptFile`);
           
-          // 🔧 CORRECCIÓN: Convertir Buffer/objeto a base64 string
+          // Corrección: Convertir Buffer/objeto a base64 string
           let base64Data;
           if (Buffer.isBuffer(rawMedia)) {
             base64Data = rawMedia.toString('base64');
@@ -150,7 +143,6 @@ async function downloadMediaSafely(client, message) {
           } else if (typeof rawMedia === 'string') {
             base64Data = rawMedia;
           } else {
-            // Intentar convertir cualquier cosa a Buffer y luego a base64
             base64Data = Buffer.from(rawMedia).toString('base64');
           }
           
@@ -171,7 +163,7 @@ async function downloadMediaSafely(client, message) {
         if (rawMedia) {
           console.log(`[${now()}] ✅ Media descargada con downloadFile`);
           
-          // 🔧 CORRECCIÓN: Convertir Buffer/objeto a base64 string
+          // Convertir Buffer/objeto a base64 string
           let base64Data;
           if (Buffer.isBuffer(rawMedia)) {
             base64Data = rawMedia.toString('base64');
@@ -213,15 +205,16 @@ wppconnect.create({
 }).then(client => {
   console.log(`[${now()}] ✅ Cliente conectado y listo!`);
 
-setInterval(async () => {
+  // === NUEVO: Keep-alive simple ===
+  setInterval(async () => {
     try {
       await client.isConnected();
-      console.log('🏓 Ping OK');
+      console.log(`[${now()}] 🏓 Ping OK`);
     } catch (error) {
-      console.log('❌ Conexión perdida, saliendo...');
-      process.exit(1);
+      console.log(`[${now()}] ❌ Conexión perdida, saliendo...`);
+      process.exit(1); // PM2 lo reiniciará automáticamente
     }
-  }, 2 * 60 * 1000);
+  }, 2 * 60 * 1000); // Cada 2 minutos
 
   client.onMessage(async (message) => {
     try {
@@ -272,6 +265,13 @@ setInterval(async () => {
             console.log(`[${now()}] ↪️ Ignorado 'vendido(s)'`);
             return;
           }
+
+          // === NUEVO: Filtrar mensajes administrativos ===
+          if (esMensajeAdministrativo(texto)) {
+            console.log(`[${now()}] 📋 Ignorado mensaje administrativo (solo texto)`);
+            return;
+          }
+
           const review = await obtenerGrupo(GRUPO_REVISION, client);
           if (review) {
             await client.sendText(review.id, texto);
@@ -281,6 +281,13 @@ setInterval(async () => {
 
         // MEDIA + CAPTION
         else if (mediaFlag && message.caption) {
+          
+          // === NUEVO: Filtrar mensajes administrativos PRIMERO ===
+          if (esMensajeAdministrativo(message.caption)) {
+            console.log(`[${now()}] 📋 Ignorado mensaje administrativo (con imagen)`);
+            return;
+          }
+
           const processed = procesarMensaje(message.caption);
           const media = await downloadMediaSafely(client, message);
           if (!media) {
@@ -296,7 +303,7 @@ setInterval(async () => {
             if (ok) console.log(`[${now()}] ✅ Img+texto a destino: ${processed.text}`);
           } else if (!processed.isValid && reviewOk) {
             const ok = await sendMediaWithCaption(client, reviewOk.id, media, message.caption);
-            if (ok) console.log(`[${now()}] ✅ Img+texto enviado a revisión`);
+            if (ok) console.log(`[${now()}] 📋 Img+texto enviado a revisión (no se pudo procesar precio)`);
           }
         }
 
@@ -322,10 +329,13 @@ setInterval(async () => {
       console.error(`[${now()}] 🔍 Stack trace:`, e?.stack);
     }
   });
+
+// === NUEVO: Detectar errores fatales ===
 process.on('uncaughtException', (error) => {
-  console.error('💥 Error fatal:', error.message);
-  process.exit(1);
+  console.error(`[${now()}] 💥 Error fatal:`, error.message);
+  process.exit(1); // PM2 reinicia automáticamente
 });
+
 }).catch(err => console.error('❌ Error iniciando WPPConnect:', err));
 
 // === Utilidad: buscar grupo por nombre ===
