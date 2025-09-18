@@ -14,6 +14,8 @@ function procesarMensaje(text) {
         .replace(/referencia\s+\d+/gi, "") // Eliminar "referencia 123"
         .replace(/código\s+\d+/gi, "") // Eliminar "código 456"
         .replace(/ref\s+\d+/gi, "") // Eliminar "ref 789"
+        // NUEVO: Eliminar precios de anticipo/contado/adelantado
+        .replace(/(?:anticipo|apartado|contado|adelantado|anricpo|anticpo|anticpo|antiicpo|anticp)\s+\$?\d+/gi, "")
         .replace(/\s+/g, " ") // Normalizar espacios
         .trim();
 
