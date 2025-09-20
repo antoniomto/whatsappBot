@@ -1,4 +1,79 @@
-function procesarMensaje(text) {
+const { getLastAliasOfDay, getSheetCode } = require('./sheets.js');
+
+// Contadores en memoria para alias
+const aliasCounters = {
+    'A': 0,
+    'V': 0,
+    'F': 0
+};
+
+// Mapeo de nombres de grupos a claves de proveedor
+const proveedorMap = {
+    'Ventas usa clouthes andys': 'A',
+    'Proveedor Fake': 'F',
+    'Mayoristas VIP 2': 'V'
+};
+
+// Inicializar contadores desde Sheets al arrancar
+async function initializeCounters() {
+    for (const [proveedor, clave] of Object.entries(proveedorMap)) {
+        try {
+            const lastAlias = await getLastAliasOfDay(clave);
+            aliasCounters[clave] = lastAlias;
+            console.log(`Contador ${clave} inicializado en: ${lastAlias}`);
+        } catch (error) {
+            console.warn(`Error inicializando contador ${clave}, usando 0`);
+            aliasCounters[clave] = 0;
+        }
+    }
+}
+
+// Generar ID largo único
+function generateLongId(proveedorClave) {
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-1);
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const hour = now.getHours().toString().padStart(2, '0');
+    const minute = now.getMinutes().toString().padStart(2, '0');
+    const second = now.getSeconds().toString().padStart(2, '0');
+    const millisecond = now.getMilliseconds().toString().padStart(3, '0');
+    
+    return `${proveedorClave}${year}${month}${day}${hour}${minute}${second}${millisecond}`;
+}
+
+// Generar alias con código de hoja
+async function generateAlias(proveedorClave) {
+    try {
+        // Obtener código de hoja actual
+        const sheetCode = await getSheetCode();
+        
+        // Incrementar contador
+        aliasCounters[proveedorClave] = (aliasCounters[proveedorClave] || 0) + 1;
+        const numero = aliasCounters[proveedorClave].toString().padStart(3, '0');
+        
+        // Formato: [Proveedor][CódigoHoja][Secuencial]
+        return `${proveedorClave}${sheetCode}${numero}`;
+    } catch (error) {
+        console.error('Error generando alias:', error);
+        // Fallback sin código de hoja
+        aliasCounters[proveedorClave] = (aliasCounters[proveedorClave] || 0) + 1;
+        const numero = aliasCounters[proveedorClave].toString().padStart(3, '0');
+        return `${proveedorClave}P1${numero}`;
+    }
+}
+
+// Obtener clave de proveedor por nombre de grupo
+function getProveedorClave(groupName) {
+    for (const [nombreGrupo, clave] of Object.entries(proveedorMap)) {
+        if (groupName.includes(nombreGrupo)) {
+            return clave;
+        }
+    }
+    return null;
+}
+
+async function procesarMensaje(text, shouldGenerateCode = false, groupName = '') {
     if (!text || text.trim().length === 0) {
         return { isValid: false, text };
     }
@@ -66,15 +141,38 @@ function procesarMensaje(text) {
         .replace(/\s+/g, " ") // Normalizar espacios
         .trim();
 
-    // Construir mensaje final
-    const mensajeFinal = descripcionLimpia 
+    // Paso 8: NUEVO - Generar código si se requiere
+    let mensajeFinal = descripcionLimpia 
         ? `${descripcionLimpia} precio: $${precioConIncremento}` 
         : `$${precioConIncremento}`;
 
+    let productCode = null;
+    let idLargo = null;
+    let proveedorClave = null;
+
+    if (shouldGenerateCode && groupName) {
+        proveedorClave = getProveedorClave(groupName);
+        if (proveedorClave) {
+            idLargo = generateLongId(proveedorClave);
+            productCode = await generateAlias(proveedorClave);
+            mensajeFinal += ` - Código: ${productCode}`;
+        }
+    }
+
     return { 
         isValid: true, 
-        text: mensajeFinal 
+        text: mensajeFinal,
+        productCode,
+        idLargo,
+        proveedorClave,
+        precioOriginal,
+        precioConIncremento,
+        descripcionLimpia
     };
 }
 
-module.exports = procesarMensaje;
+module.exports = {
+    procesarMensaje,
+    initializeCounters,
+    getProveedorClave
+};
