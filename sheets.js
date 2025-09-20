@@ -4,9 +4,32 @@ const { JWT } = require('google-auth-library');
 let doc = null;
 let prodsSheet = null;
 let pedidosSheet = null;
-let currentSheetCode = null;
+let currentSheetCode = 'P1';
 
 const now = () => new Date().toLocaleString();
+
+// Leer código de hoja actual desde K1
+async function getSheetCode() {
+  try {
+    if (!prodsSheet) {
+      console.warn(`[${now()}] ProdsSheet no disponible, usando P1`);
+      return 'P1';
+    }
+    
+    await prodsSheet.loadCells('K1');
+    const codigo = prodsSheet.getCell(0, 10).value;
+    
+    if (codigo && codigo !== currentSheetCode) {
+      currentSheetCode = codigo;
+      console.log(`[${now()}] Código de hoja actualizado: ${currentSheetCode}`);
+    }
+    
+    return currentSheetCode || 'P1';
+  } catch (error) {
+    console.error(`[${now()}] Error leyendo código de hoja:`, error.message);
+    return currentSheetCode || 'P1';
+  }
+}
 
 // Inicializar conexión con Google Sheets
 async function initializeSheets() {
@@ -21,16 +44,20 @@ async function initializeSheets() {
     await doc.loadInfo();
     
     // Buscar o crear hoja "PRODS_ACTUAL"
-    let prodsSheet = doc.sheetsByTitle['PRODS_ACTUAL'];
+    prodsSheet = doc.sheetsByTitle['PRODS_ACTUAL'];
     if (!prodsSheet) {
       prodsSheet = await doc.addSheet({ 
         title: 'PRODS_ACTUAL',
         headerValues: ['ID_Largo', 'Alias', 'Fecha', 'Proveedor', 'Producto', 'Precio_Base', 'Precio_Venta', 'Status']
       });
+      // Agregar código de hoja inicial en K1
+      await prodsSheet.loadCells('K1');
+      prodsSheet.getCell(0, 10).value = 'P1';
+      await prodsSheet.saveUpdatedCells();
     }
     
     // Buscar o crear hoja "PEDIDO_ACTUAL"
-    let pedidosSheet = doc.sheetsByTitle['PEDIDO_ACTUAL'];
+    pedidosSheet = doc.sheetsByTitle['PEDIDO_ACTUAL'];
     if (!pedidosSheet) {
       pedidosSheet = await doc.addSheet({ 
         title: 'PEDIDO_ACTUAL',
@@ -38,13 +65,13 @@ async function initializeSheets() {
       });
     }
     
-    // Asignar sheet principal para compatibilidad
-    sheet = prodsSheet;
+    // Leer código de hoja actual
+    currentSheetCode = await getSheetCode();
     
-    console.log(`[${now()}] ✅ Google Sheets conectado: ${doc.title} (2 pestañas)`);
+    console.log(`[${now()}] Google Sheets conectado: ${doc.title} - Código hoja: ${currentSheetCode}`);
     return true;
   } catch (error) {
-    console.error(`[${now()}] ❌ Error conectando Google Sheets:`, error.message);
+    console.error(`[${now()}] Error conectando Google Sheets:`, error.message);
     return false;
   }
 }
@@ -53,11 +80,11 @@ async function initializeSheets() {
 async function getLastAliasOfDay(proveedorClave) {
   try {
     if (!prodsSheet) {
-      console.warn(`[${now()}] ⚠️ PRODS_ACTUAL no disponible, retornando alias 0`);
+      console.warn(`[${now()}] PRODS_ACTUAL no disponible, retornando alias 0`);
       return 0;
     }
 
-    // Obtener código de hoja actual (función async)
+    // Obtener código de hoja actual
     const sheetCode = await getSheetCode();
     const aliasPrefix = `${proveedorClave}${sheetCode}`;
 
@@ -78,7 +105,7 @@ async function getLastAliasOfDay(proveedorClave) {
     
     return Math.max(...aliases);
   } catch (error) {
-    console.error(`[${now()}] ❌ Error obteniendo último alias:`, error.message);
+    console.error(`[${now()}] Error obteniendo último alias:`, error.message);
     return 0;
   }
 }
@@ -87,11 +114,13 @@ async function getLastAliasOfDay(proveedorClave) {
 async function saveProduct(productData) {
   try {
     if (!prodsSheet) {
-      console.warn(`[${now()}] ⚠️ PRODS_ACTUAL no disponible, guardando solo en memoria`);
+      console.warn(`[${now()}] PRODS_ACTUAL no disponible`);
       return false;
     }
 
-    await prodsSheet.addRow({
+    console.log(`[${now()}] Intentando guardar producto:`, productData.alias);
+
+    const row = await prodsSheet.addRow({
       'ID_Largo': productData.idLargo,
       'Alias': productData.alias,
       'Fecha': productData.fecha,
@@ -102,10 +131,10 @@ async function saveProduct(productData) {
       'Status': 'Disponible'
     });
 
-    console.log(`[${now()}] ✅ Producto ${productData.alias} guardado en PRODS_ACTUAL`);
+    console.log(`[${now()}] Producto ${productData.alias} guardado en fila ${row._rowNumber}`);
     return true;
   } catch (error) {
-    console.error(`[${now()}] ❌ Error guardando en PRODS_ACTUAL:`, error.message);
+    console.error(`[${now()}] Error guardando en PRODS_ACTUAL:`, error.message);
     return false;
   }
 }
@@ -114,7 +143,7 @@ async function saveProduct(productData) {
 async function updateProductStatus(alias, cliente, status = 'Confirmado') {
   try {
     if (!prodsSheet || !pedidosSheet) {
-      console.warn(`[${now()}] ⚠️ Sheets no disponibles para actualizar ${alias}`);
+      console.warn(`[${now()}] Sheets no disponibles para actualizar ${alias}`);
       return false;
     }
 
@@ -123,13 +152,13 @@ async function updateProductStatus(alias, cliente, status = 'Confirmado') {
     const prodRow = prodsRows.find(r => r.get('Alias') === alias);
     
     if (!prodRow) {
-      console.warn(`[${now()}] ⚠️ Alias ${alias} no encontrado en PRODS_ACTUAL`);
+      console.warn(`[${now()}] Alias ${alias} no encontrado en PRODS_ACTUAL`);
       return false;
     }
 
     // 2. Verificar que no esté ya pedido
     if (prodRow.get('Status') === 'Pedido') {
-      console.warn(`[${now()}] ⚠️ ${alias} ya está confirmado como pedido`);
+      console.warn(`[${now()}] ${alias} ya está confirmado como pedido`);
       return false;
     }
 
@@ -151,10 +180,10 @@ async function updateProductStatus(alias, cliente, status = 'Confirmado') {
     prodRow.set('Status', 'Pedido');
     await prodRow.save();
 
-    console.log(`[${now()}] ✅ ${alias} confirmado: copiado a PEDIDO_ACTUAL - Cliente: ${cliente}`);
+    console.log(`[${now()}] ${alias} confirmado: copiado a PEDIDO_ACTUAL - Cliente: ${cliente}`);
     return true;
   } catch (error) {
-    console.error(`[${now()}] ❌ Error confirmando pedido ${alias}:`, error.message);
+    console.error(`[${now()}] Error confirmando pedido ${alias}:`, error.message);
     return false;
   }
 }
@@ -178,7 +207,7 @@ async function findProductByAlias(alias) {
       status: row.get('Status')
     };
   } catch (error) {
-    console.error(`[${now()}] ❌ Error buscando ${alias}:`, error.message);
+    console.error(`[${now()}] Error buscando ${alias}:`, error.message);
     return null;
   }
 }
