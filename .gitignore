@@ -8,12 +8,6 @@ yarn-error.log*
 # Dependencias
 node_modules/
 
-# Variables de entorno (IMPORTANTE)
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
 
 # Archivos temporales del bot
 tokens/
