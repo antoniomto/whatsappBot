@@ -1,5 +1,3 @@
-const { getLastAliasOfDay, getSheetCode } = require('./sheets.js');
-
 // Contadores en memoria para alias
 const aliasCounters = {
     'A': 0,
@@ -14,15 +12,27 @@ const proveedorMap = {
     'Mayoristas VIP 2': 'V'
 };
 
+// Variable para evitar imports circulares
+let sheetsModule = null;
+
+// Función para obtener el módulo de sheets de forma diferida
+function getSheetsModule() {
+    if (!sheetsModule) {
+        sheetsModule = require('./sheets.js');
+    }
+    return sheetsModule;
+}
+
 // Inicializar contadores desde Sheets al arrancar
 async function initializeCounters() {
     for (const [proveedor, clave] of Object.entries(proveedorMap)) {
         try {
-            const lastAlias = await getLastAliasOfDay(clave);
+            const sheets = getSheetsModule();
+            const lastAlias = await sheets.getLastAliasOfDay(clave);
             aliasCounters[clave] = lastAlias;
             console.log(`Contador ${clave} inicializado en: ${lastAlias}`);
         } catch (error) {
-            console.warn(`Error inicializando contador ${clave}, usando 0`);
+            console.warn(`Error inicializando contador ${clave}, usando 0:`, error.message);
             aliasCounters[clave] = 0;
         }
     }
@@ -46,7 +56,8 @@ function generateLongId(proveedorClave) {
 async function generateAlias(proveedorClave) {
     try {
         // Obtener código de hoja actual
-        const sheetCode = await getSheetCode();
+        const sheets = getSheetsModule();
+        const sheetCode = await sheets.getSheetCode();
         
         // Incrementar contador
         aliasCounters[proveedorClave] = (aliasCounters[proveedorClave] || 0) + 1;
@@ -55,7 +66,7 @@ async function generateAlias(proveedorClave) {
         // Formato: [Proveedor][CódigoHoja][Secuencial]
         return `${proveedorClave}${sheetCode}${numero}`;
     } catch (error) {
-        console.error('Error generando alias:', error);
+        console.error('Error generando alias:', error.message);
         // Fallback sin código de hoja
         aliasCounters[proveedorClave] = (aliasCounters[proveedorClave] || 0) + 1;
         const numero = aliasCounters[proveedorClave].toString().padStart(3, '0');
@@ -89,7 +100,7 @@ async function procesarMensaje(text, shouldGenerateCode = false, groupName = '')
         .replace(/referencia\s+\d+/gi, "") // Eliminar "referencia 123"
         .replace(/código\s+\d+/gi, "") // Eliminar "código 456"
         .replace(/ref\s+\d+/gi, "") // Eliminar "ref 789"
-        // NUEVO: Eliminar precios de anticipo/contado/adelantado
+        // Eliminar precios de anticipo/contado/adelantado
         .replace(/(?:anticipo|apartado|contado|adelantado|anricpo|anticpo|anticpo|antiicpo|anticp)\s+\$?\d+/gi, "")
         .replace(/\s+/g, " ") // Normalizar espacios
         .trim();
@@ -112,7 +123,7 @@ async function procesarMensaje(text, shouldGenerateCode = false, groupName = '')
         return { isValid: false, text }; // Fuera de rango → revisión
     }
 
-    // Paso 6: Aplicar márgenes (tu lógica original)
+    // Paso 6: Aplicar márgenes
     let incremento = 1.20;
     if (precioOriginal >= 100 && precioOriginal <= 1000) {
         incremento = 1.20; // 20%
@@ -141,7 +152,7 @@ async function procesarMensaje(text, shouldGenerateCode = false, groupName = '')
         .replace(/\s+/g, " ") // Normalizar espacios
         .trim();
 
-    // Paso 8: NUEVO - Generar código si se requiere
+    // Paso 8: Generar código si se requiere
     let mensajeFinal = descripcionLimpia 
         ? `${descripcionLimpia} precio: $${precioConIncremento}` 
         : `$${precioConIncremento}`;
@@ -153,9 +164,14 @@ async function procesarMensaje(text, shouldGenerateCode = false, groupName = '')
     if (shouldGenerateCode && groupName) {
         proveedorClave = getProveedorClave(groupName);
         if (proveedorClave) {
-            idLargo = generateLongId(proveedorClave);
-            productCode = await generateAlias(proveedorClave);
-            mensajeFinal += ` - Código: ${productCode}`;
+            try {
+                idLargo = generateLongId(proveedorClave);
+                productCode = await generateAlias(proveedorClave);
+                mensajeFinal += ` - Código: ${productCode}`;
+            } catch (error) {
+                console.error('Error generando código:', error.message);
+                // Continuar sin código si hay error
+            }
         }
     }
 
